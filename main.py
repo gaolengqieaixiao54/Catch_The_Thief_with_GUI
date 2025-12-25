@@ -13,63 +13,73 @@ from utils import (
 
 # --- Game 类 ---
 class Game:
-    def __init__(self, size, INITIAL_POLICE_COUNT):
-        pygame.init()
-
+    def __init__(self, size, initial_police_count, headless=False):
+        """
+        初始化游戏实例
+        :param size: 地图尺寸
+        :param initial_police_count: 初始警察数量
+        :param headless: 是否开启无界面模式（用于自动化实验）
+        """
+        self.headless = headless
         self.size = size
 
-        # ===== 密度 =====
+        # 1. 基础配置初始化
         self.density_options = c.DENSITY_OPTIONS
         self.current_density_index = c.DEFAULT_DENSITY_INDEX
         self.current_obstacle_density = self.density_options[self.current_density_index]
         self.map_data = None
 
-        self.screen = pygame.display.set_mode((c.SCREEN_WIDTH, c.SCREEN_HEIGHT))
-        pygame.display.set_caption(c.CAPTION)
-        self.clock = pygame.time.Clock()
-
-        # ===== FPS =====
+        # 2. FPS 与速度配置
         self.fps_options = c.FPS_OPTIONS
         self.current_fps_index = c.DEFAULT_FPS_INDEX
         self.fps = self.fps_options[self.current_fps_index]
         self.move_interval = 1000 / self.fps
+        self.move_timer = 0
 
-        # ===== 警察算法选择 =====
+        # 3. AI 算法配置
         self.algorithm_list = list(POLICE_ALGORITHMS.keys())
         self.algorithm_index = 0
         self.police_algorithm = self.algorithm_list[self.algorithm_index]
 
-        # ===== 字体 =====
-        try:
-            self.font_small = pygame.font.Font(c.SIMHEI_FONT_PATH, 22)
-            self.font_medium = pygame.font.Font(c.SIMHEI_FONT_PATH, 26)
-            self.font_large = pygame.font.Font(c.SIMHEI_FONT_PATH, 32)
-            self.font_menu = self.font_large
-            self.font_count = self.font_medium
-        except FileNotFoundError:
-            self.font_small = pygame.font.Font(None, 22)
-            self.font_medium = pygame.font.Font(None, 26)
-            self.font_large = pygame.font.Font(None, 32)
-            self.font_menu = self.font_large
-            self.font_count = self.font_medium
-
-        # ===== 状态 =====
+        # 4. 游戏状态跟踪
         self.running = True
         self.state = c.GAME_STATES["MENU"]
         self.turn = 0
         self.total_steps = 0
         self.game_over_reason = ""
-
-        self.current_police_count = c.INITIAL_POLICE_COUNT
-        self.move_timer = 0
-
+        self.current_police_count = initial_police_count
         self.current_police_index = 0  # 追踪当前移动的警察编号
         self.sub_step_state = "POLICE"  # 当前子阶段：POLICE 或 THIEF
-
         self.max_history_size = 50
         self.history_states = []
 
-        self.setup_menu()
+        # 5. 图形界面与多媒体初始化（仅在非静默模式下运行）
+        if not self.headless:
+            pygame.init()
+            self.screen = pygame.display.set_mode((c.SCREEN_WIDTH, c.SCREEN_HEIGHT))
+            pygame.display.set_caption(c.CAPTION)
+            self.clock = pygame.time.Clock()
+
+            # 字体初始化
+            try:
+                self.font_small = pygame.font.Font(c.SIMHEI_FONT_PATH, 22)
+                self.font_medium = pygame.font.Font(c.SIMHEI_FONT_PATH, 26)
+                self.font_large = pygame.font.Font(c.SIMHEI_FONT_PATH, 32)
+            except (FileNotFoundError, OSError):
+                # 备用方案：如果找不到黑体，使用系统默认字体
+                self.font_small = pygame.font.Font(None, 22)
+                self.font_medium = pygame.font.Font(None, 26)
+                self.font_large = pygame.font.Font(None, 32)
+
+            self.font_menu = self.font_large
+            self.font_count = self.font_medium
+
+            # 初始化菜单按钮
+            self.setup_menu()
+        else:
+            # 静默模式下，clock 仍然需要，但不需要显示器
+            self.clock = pygame.time.Clock()
+            self.screen = None
 
     # ================== MENU 布局 ==================
     def setup_menu(self):
@@ -134,7 +144,12 @@ class Game:
             self.fps = self.fps_options[self.current_fps_index]
             self.move_interval = 1000 / self.fps
 
-    def start_game(self):
+    def start_game(self, algo_override=None, density_override=None, count_override=None):
+        """修改 start_game 允许外部传入实验参数"""
+        if algo_override: self.police_algorithm = algo_override
+        if density_override is not None: self.current_obstacle_density = density_override
+        if count_override: self.current_police_count = count_override
+
         # 初始化地图
         self.map_data = GridMap(
             self.size,

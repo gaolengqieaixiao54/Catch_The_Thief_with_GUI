@@ -1,77 +1,97 @@
+import os
 import pandas as pd
-import itertools
-import time
-from tqdm import tqdm  # 用于显示进度条
-# 导入修改后的游戏代码中的模拟函数和常量
-from main import run_simulation, GRID_SIZE
+import sys  # <--- 必须导入 sys 模块
+from tqdm import tqdm
+from main import Game
+import constants as c
+from utils import POLICE_ALGORITHMS
 
-# --- 实验配置 ---
-POLICE_COUNTS = [3, 4, 5, 6, 7]  # P 组合
-OBSTACLE_DENSITIES = [0.05, 0.15, 0.25]  # O 组合
-N_RUNS = 100  # 每个场景重复运行次数
-MAX_TURNS = 2000  # 单次模拟的最大回合数，防止无限循环
+# ================== 实验配置 ==================
+POLICE_COUNTS = list(range(2, 8))
+DENSITIES = [0.05, 0.15, 0.25]
+ALGORITHMS = list(POLICE_ALGORITHMS.keys())
 
-# 1. 生成所有实验场景
-experiments = list(itertools.product(POLICE_COUNTS, OBSTACLE_DENSITIES))
-total_runs = len(experiments) * N_RUNS
+TRIALS_PER_GROUP = 20
+MAX_TURNS_SAFETY = 1000
 
-# 2. 初始化数据存储
-results = []
+OUTPUT_DIR = "output"
+if not os.path.exists(OUTPUT_DIR):
+    os.makedirs(OUTPUT_DIR)
 
-print(f"--- 警察抓小偷实验开始 ---")
-print(f"总场景数: {len(experiments)}")
-print(f"每个场景重复次数: {N_RUNS}")
-print(f"总运行次数: {total_runs}")
 
-start_time = time.time()
+def run_experiment():
+    all_results = []
+    total_groups = len(POLICE_COUNTS) * len(DENSITIES) * len(ALGORITHMS)
 
-# 3. 运行实验
-with tqdm(total=total_runs, desc="Running Experiments") as pbar:
-    for police_count, density in experiments:
-        # 对每个 (P, O) 组合，重复运行 N_RUNS 次
-        for run_id in range(N_RUNS):
-            # 自动调用 run_simulation 函数
-            turns, end_reason = run_simulation(
-                grid_size=GRID_SIZE,
-                police_count=police_count,
-                obstacle_density=density,
-                max_turns=MAX_TURNS
-            )
+    print(f"开始自动化实验任务...")
 
-            # 记录结果
-            results.append({
-                "Police_Count": police_count,
-                "Obstacle_Density": density,
-                "Run_ID": run_id + 1,
-                "Turns": turns,
-                "End_Reason": end_reason
-            })
+    # 使用 sys.stdout 配合 dynamic_ncols=True 可以更好地在 IDE 中刷新
+    pbar_total = tqdm(total=total_groups, desc="总进度", position=0, leave=True, file=sys.stdout, dynamic_ncols=True)
 
-            pbar.update(1)
+    for count in POLICE_COUNTS:
+        for density in DENSITIES:
+            for algo in ALGORITHMS:
+                group_desc = f"P={count}|D={density:.2f}|{algo}"
+                group_data = []
 
-end_time = time.time()
+                # 每一组的 20 次实验不新开进度条，而是更新主进度条的后缀
+                for trial in range(TRIALS_PER_GROUP):
+                    # 动态更新条右侧的文字
+                    pbar_total.set_postfix_str(f"当前: {group_desc} | 轮次: {trial + 1}/{TRIALS_PER_GROUP}")
 
-# 4. 数据后处理与保存
-df = pd.DataFrame(results)
+                    # 传入 headless=True 确保不弹窗
+                    game = Game(c.GRID_SIZE, count, headless=True)
+                    game.start_game(
+                        algo_override=algo,
+                        density_override=density,
+                        count_override=count
+                    )
 
-# 聚合统计结果 (方便快速查看)
-summary = df.groupby(['Police_Count', 'Obstacle_Density']).agg(
-    Avg_Turns=('Turns', 'mean'),
-    Capture_Rate=('End_Reason', lambda x: (x == 'Capture').sum() / N_RUNS),
-    Stalemate_Rate=('End_Reason', lambda x: (x == 'Stalemate').sum() / N_RUNS)
-).reset_index()
+                    while game.state == c.GAME_STATES["RUNNING"] and game.turn < MAX_TURNS_SAFETY:
+                        game.handle_turn()
 
-# 5. 保存到 CSV 文件
-timestamp = time.strftime("%Y%m%d_%H%M%S")
-filename_detail = f"experiment_results_detail_{timestamp}.csv"
-filename_summary = f"experiment_results_summary_{timestamp}.csv"
+                    reason = game.game_over_reason if game.turn < MAX_TURNS_SAFETY else "Timeout"
+                    res = {
+                        "police_count": count,
+                        "density": density,
+                        "algorithm": algo,
+                        "trial_id": trial + 1,
+                        "total_turns": game.turn,
+                        "total_steps": game.total_steps,
+                        "game_over_reason": reason
+                    }
+                    all_results.append(res)
+                    group_data.append(res)
 
-df.to_csv(filename_detail, index=False, encoding='utf_8_sig')
-summary.to_csv(filename_summary, index=False, encoding='utf_8_sig')
+                # 保存每组详情
+                group_df = pd.DataFrame(group_data)
+                safe_algo_name = algo.replace("*", "Star")
+                filename = f"detail_P{count}_D{density}_{safe_algo_name}.csv"
+                group_df.to_csv(os.path.join(OUTPUT_DIR, filename), index=False)
 
-print(f"\n--- 实验完成 ---")
-print(f"总耗时: {end_time - start_time:.2f} 秒")
-print(f"详细结果已保存到: {filename_detail}")
-print(f"统计摘要已保存到: {filename_summary}")
-print("\n摘要:")
-print(summary)
+                # 完成一组，进度条加 1
+                pbar_total.update(1)
+
+    pbar_total.close()
+    print("\n\n所有实验逻辑运行完毕，正在生成汇总报表...")
+
+    # --- 数据汇总逻辑 ---
+    full_df = pd.DataFrame(all_results)
+    full_df.to_csv(os.path.join(OUTPUT_DIR, "all_trials_raw.csv"), index=False)
+
+    summary = full_df.groupby(["police_count", "density", "algorithm"]).agg({
+        "total_turns": ["mean", "std"],
+        "total_steps": ["mean", "std"]
+    }).reset_index()
+
+    summary.columns = [
+        "police_count", "density", "algorithm",
+        "avg_turns", "std_turns", "avg_steps", "std_steps"
+    ]
+
+    summary.to_csv(os.path.join(OUTPUT_DIR, "experiment_summary.csv"), index=False)
+    print(f"✅ 实验成功！报表位置: {os.path.join(OUTPUT_DIR, 'experiment_summary.csv')}")
+
+
+if __name__ == "__main__":
+    run_experiment()
