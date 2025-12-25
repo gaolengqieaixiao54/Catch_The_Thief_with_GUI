@@ -6,10 +6,10 @@ It is a **curriculum design** for data structures and algorithms by **Pygame**.
 
 # Functions description
 Users can adjust the number of the police, the density of the barriers, police's catching algorithms and FPS.
-<img width="1200" height="1536" alt="image" src="https://github.com/user-attachments/assets/74423665-a874-4ab2-9518-d886b89a0b4a" />
+<img width="300" height="384" alt="image" src="https://github.com/user-attachments/assets/74423665-a874-4ab2-9518-d886b89a0b4a" />
 
 Then the GUI will show how police catch the thief cooperatively **step by step**.
-<img width="1200" height="1536" alt="image" src="https://github.com/user-attachments/assets/0010a1c4-6454-483a-a409-5eb4b33481da" />
+<img width="300" height="384" alt="image" src="https://github.com/user-attachments/assets/0010a1c4-6454-483a-a409-5eb4b33481da" />
 
 # Structure
 ## main.py
