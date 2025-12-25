@@ -1,6 +1,3 @@
-# Interaction Language
-Chinese (Using SimHei.ttf for support)
-
 # Purpose
 It is a *curriculum design* for data structures and algorithms by *Pygame*. 
 
