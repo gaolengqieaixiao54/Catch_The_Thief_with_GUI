@@ -21,7 +21,8 @@ pygame  | 游戏引擎，负责渲染画面和处理输入。
 pandas  | 数据分析工具，负责 CSV 文件的处理和汇总。
 tqdm  | 进度条工具，负责在控制台显示实验进度。
 
-```pip install pygame
+```
+pip install pygame
 pip install pandas
 pip install tqdm
 ```
