@@ -24,6 +24,7 @@ tqdm  | A visual utility that provides smart, real-time progress bars in the con
 ```
 pip install pygame, pandas, tqdm
 ```
+My environment (MacOS): Python 3.12.12, pygame 2.6.1, pandas 2.3.3, tqdm 4.67.1
 
 # Structure
 ## main.py
