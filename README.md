@@ -17,14 +17,12 @@ Then the GUI will show how police catch the thief cooperatively *step by step*.
 
 库名  | 主要用途
  ---- | ------  
-pygame  | 游戏引擎，负责渲染画面和处理输入。
-pandas  | 数据分析工具，负责 CSV 文件的处理和汇总。
-tqdm  | 进度条工具，负责在控制台显示实验进度。
+pygame  | Render the game interface, handle real-time user inputs, and manage the core game loop.
+pandas  | A data analysis tool used to structure raw experimental results and generate summarized statistical reports in CSV format.
+tqdm  | A visual utility that provides smart, real-time progress bars in the console.
 
 ```
-pip install pygame
-pip install pandas
-pip install tqdm
+pip install pygame, pandas, tqdm
 ```
 
 # Structure
