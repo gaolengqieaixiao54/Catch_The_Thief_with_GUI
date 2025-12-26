@@ -1,7 +1,9 @@
 # Python cache
 __pycache__/
 *.pyc
+# MacOS junk
+.DS_Store
 
 # Experiment outputs
 output/
-
+pics/
