@@ -24,8 +24,6 @@ def run_experiment():
     total_groups = len(POLICE_COUNTS) * len(DENSITIES) * len(ALGORITHMS)
 
     print(f"开始自动化实验任务...")
-
-    # 使用 sys.stdout 配合 dynamic_ncols=True 可以更好地在 IDE 中刷新
     pbar_total = tqdm(total=total_groups, desc="总进度", position=0, leave=True, file=sys.stdout, dynamic_ncols=True)
 
     for count in POLICE_COUNTS:
@@ -34,60 +32,61 @@ def run_experiment():
                 group_desc = f"P={count}|D={density:.2f}|{algo}"
                 group_data = []
 
-                # 每一组的 20 次实验不新开进度条，而是更新主进度条的后缀
                 for trial in range(TRIALS_PER_GROUP):
-                    # 动态更新条右侧的文字
                     pbar_total.set_postfix_str(f"当前: {group_desc} | 轮次: {trial + 1}/{TRIALS_PER_GROUP}")
 
-                    # 传入 headless=True 确保不弹窗
                     game = Game(c.GRID_SIZE, count, headless=True)
-                    game.start_game(
-                        algo_override=algo,
-                        density_override=density,
-                        count_override=count
-                    )
+                    game.start_game(algo_override=algo, density_override=density, count_override=count)
 
                     while game.state == c.GAME_STATES["RUNNING"] and game.turn < MAX_TURNS_SAFETY:
                         game.handle_turn()
 
                     reason = game.game_over_reason if game.turn < MAX_TURNS_SAFETY else "Timeout"
                     res = {
-                        "police_count": count,
-                        "density": density,
-                        "algorithm": algo,
-                        "trial_id": trial + 1,
-                        "total_turns": game.turn,
-                        "total_steps": game.total_steps,
-                        "game_over_reason": reason
+                        "police_count": count, "density": density, "algorithm": algo,
+                        "trial_id": trial + 1, "total_turns": game.turn,
+                        "total_steps": game.total_steps, "game_over_reason": reason
                     }
                     all_results.append(res)
                     group_data.append(res)
 
-                # 保存每组详情
+                # 保存每组详情（在内层循环结束后）
                 group_df = pd.DataFrame(group_data)
                 safe_algo_name = algo.replace("*", "Star")
                 filename = f"detail_P{count}_D{density}_{safe_algo_name}.csv"
                 group_df.to_csv(os.path.join(OUTPUT_DIR, filename), index=False)
 
-                # 完成一组，进度条加 1
                 pbar_total.update(1)
 
+    # =======================================================
+    # 注意：以下逻辑必须与上面的 for count in POLICE_COUNTS: 对齐
+    # 这样它才会在所有循环彻底结束后仅运行一次
+    # =======================================================
     pbar_total.close()
     print("\n\n所有实验逻辑运行完毕，正在生成汇总报表...")
 
-    # --- 数据汇总逻辑 ---
     full_df = pd.DataFrame(all_results)
     full_df.to_csv(os.path.join(OUTPUT_DIR, "all_trials_raw.csv"), index=False)
 
+    # 计算僵局率的辅助函数
+    def calculate_stalemate_rate(reasons):
+        stalemate_count = (reasons == "进入循环僵局").sum()
+        return stalemate_count / len(reasons)
+
     summary = full_df.groupby(["police_count", "density", "algorithm"]).agg({
         "total_turns": ["mean", "std"],
-        "total_steps": ["mean", "std"]
+        "total_steps": ["mean", "std"],
+        "game_over_reason": [calculate_stalemate_rate]
     }).reset_index()
 
     summary.columns = [
         "police_count", "density", "algorithm",
-        "avg_turns", "std_turns", "avg_steps", "std_steps"
+        "avg_turns", "std_turns", "avg_steps", "std_steps",
+        "stalemate_rate"
     ]
+
+    # 将僵局率转为百分比
+    summary["stalemate_rate"] = summary["stalemate_rate"].map(lambda x: f"{x:.2%}")
 
     summary.to_csv(os.path.join(OUTPUT_DIR, "experiment_summary.csv"), index=False)
     print(f"✅ 实验成功！报表位置: {os.path.join(OUTPUT_DIR, 'experiment_summary.csv')}")
