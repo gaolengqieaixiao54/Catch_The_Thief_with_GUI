@@ -17,11 +17,11 @@ Then the GUI will show how police catch the thief cooperatively *step by step*.
 pygame  | Render the game interface, handle real-time user inputs, and manage the core game loop.
 pandas  | A data analysis tool used to structure raw experimental results and generate summarized statistical reports in CSV format.
 tqdm  | A visual utility that provides smart, real-time progress bars in the console.
-
+matplotlib  | For drawing pictures.
 ```
-pip install pygame, pandas, tqdm
+pip install pygame, pandas, tqdm, matplotlib
 ```
-My environment (MacOS): Python 3.12.12, pygame 2.6.1, pandas 2.3.3, tqdm 4.67.1
+My environment (MacOS): Python 3.12.12, pygame 2.6.1, pandas 2.3.3, tqdm 4.67.1, matplotlib 3.10.8
 
 # Structure
 ## main.py
@@ -53,3 +53,6 @@ It classifies groups by *POLICE_COUNTS*, *DENSITIES* and *ALGORITHMS*.
 Each group runs *20 times*.
 Finally, it generates *a folder* (output/) and *records* (.csv) in this folder.
 
+## draw_pics_for_analysis.py
+After running experiment_runner.py, a result file called experiment_summary.csv will be saved.
+Based on the summary csv, draw_pics_for_analysis.py draws 3 pictures by matplotlib and save them into a new file pics/.
